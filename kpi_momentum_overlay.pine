@@ -1,0 +1,70 @@
+//@version=5
+indicator("KPI Momentum Overlay (Proxy for Python)", overlay=true, max_labels_count=500)
+
+// ============================
+// INPUTS
+// ============================
+minPrice     = input.float(2.0,  "Min Price")
+maxPrice     = input.float(20.0, "Max Price")
+minPctChange = input.float(10.0, "Min % Change")
+minRVol      = input.float(5.0,  "Min Relative Volume")
+lookback_vol = input.int(20, "RVOL Lookback")
+lookback_atr = input.int(14, "ATR Lookback")
+
+// ============================
+// CORE METRICS
+// ============================
+price_ok = close >= minPrice and close <= maxPrice
+
+pct_change = (close - open) / open * 100
+momentum_ok = pct_change >= minPctChange
+
+avg_vol  = ta.sma(volume, lookback_vol)
+rvol     = avg_vol > 0 ? (volume / avg_vol) : 0
+rvol_ok  = rvol >= minRVol
+
+vwap_val = ta.vwap
+above_vwap = close >= vwap_val
+
+atr_val = ta.atr(lookback_atr)
+atr_slow = ta.sma(atr_val, lookback_atr)
+atr_expansion = atr_slow > 0 ? (atr_val / atr_slow) : 1.0
+
+// ============================
+// KPI SCORE PROXY (0-100)
+// ============================
+// Mirror core Python logic in a simplified way
+
+// % Change (0-30)
+pct_score  = math.min(math.max((pct_change / 20) * 30, 0), 30)
+
+// RVOL (0-30)
+rvol_score = math.min(math.max((rvol / 10) * 30, 0), 30)
+
+// VWAP Control (0-20)
+vwap_score = above_vwap ? 20.0 : 0.0
+
+// ATR Expansion (0-20)
+atr_score  = math.min(math.max((atr_expansion / 3) * 20, 0), 20)
+
+kpi_score = pct_score + rvol_score + vwap_score + atr_score
+
+// ============================
+// CONDITIONS
+// ============================
+scan = price_ok and momentum_ok and rvol_ok and above_vwap
+
+// ============================
+// VISUAL OUTPUT
+// ============================
+plot(kpi_score, title="KPI Score (Proxy)", color=color.new(color.green, 0), linewidth=2)
+hline(60, "Score Threshold", color=color.orange)
+
+bgcolor(scan ? color.new(color.green, 85) : na)
+
+if scan
+    label.new(bar_index, high,
+        "KPI Hit\nScore: " + str.tostring(kpi_score, "#.0"),
+        style=label.style_label_up,
+        color=color.new(color.green, 0),
+        textcolor=color.white)

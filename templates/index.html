@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Momentum Scanner - Live Dashboard v2</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0a0e27;
+            color: #e0e0e0;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            padding: 20px;
+            background: linear-gradient(135deg, #1e3a8a 0%, #7c3aed 100%);
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            color: #fff;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            background: #1a1f3a;
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid #2a3555;
+        }
+
+        .tab-button {
+            flex: 1;
+            padding: 15px;
+            background: #0f1628;
+            color: #9ca3af;
+            border: 2px solid #2a3555;
+            border-radius: 8px;
+            font-size: 1.1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .tab-button:hover {
+            background: #1a1f3a;
+            color: #60a5fa;
+            border-color: #60a5fa;
+        }
+
+        .tab-button.active {
+            background: linear-gradient(135deg, #1e3a8a 0%, #7c3aed 100%);
+            color: #fff;
+            border-color: #7c3aed;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .filters {
+            background: #1a1f3a;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+            border: 1px solid #2a3555;
+        }
+
+        .filter-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .filter-item label {
+            color: #9ca3af;
+            font-size: 0.85em;
+            margin-bottom: 5px;
+        }
+
+        .filter-item .value {
+            color: #60a5fa;
+            font-weight: bold;
+            font-size: 1.1em;
+        }
+
+        .status-bar {
+            background: #1a1f3a;
+            padding: 10px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid #2a3555;
+        }
+
+        .status-bar .last-update {
+            color: #9ca3af;
+        }
+
+        .status-bar .scanning {
+            color: #fbbf24;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .stock-card {
+            background: #1a1f3a;
+            border: 2px solid #2a3555;
+            border-radius: 12px;
+            padding: 20px;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stock-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
+            border-color: #60a5fa;
+        }
+
+        .stock-card.passes-filter {
+            border-color: #10b981;
+            background: linear-gradient(135deg, #1a1f3a 0%, #1a3a2e 100%);
+        }
+
+        .stock-card.halt-risk {
+            border-color: #f59e0b;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .ticker {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #fff;
+        }
+
+        .score {
+            background: linear-gradient(135deg, #7c3aed 0%, #ec4899 100%);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 1.2em;
+            color: #fff;
+        }
+
+        .price-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #2a3555;
+        }
+
+        .price {
+            font-size: 2em;
+            font-weight: bold;
+            color: #fff;
+        }
+
+        .pct-change {
+            font-size: 1.4em;
+            font-weight: bold;
+            padding: 5px 12px;
+            border-radius: 6px;
+        }
+
+        .pct-change.positive {
+            color: #10b981;
+            background: rgba(16, 185, 129, 0.15);
+        }
+
+        .pct-change.negative {
+            color: #ef4444;
+            background: rgba(239, 68, 68, 0.15);
+        }
+
+        .metrics {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .metric {
+            background: #0f1628;
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid #2a3555;
+        }
+
+        .metric-label {
+            font-size: 0.75em;
+            color: #9ca3af;
+            margin-bottom: 3px;
+        }
+
+        .metric-value {
+            font-size: 1.1em;
+            font-weight: bold;
+            color: #60a5fa;
+        }
+
+        .badges {
+            display: flex;
+            gap: 8px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+
+        .badge {
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.75em;
+            font-weight: bold;
+        }
+
+        .badge.vwap {
+            background: rgba(34, 197, 94, 0.2);
+            color: #22c55e;
+            border: 1px solid #22c55e;
+        }
+
+        .badge.news {
+            background: rgba(59, 130, 246, 0.2);
+            color: #3b82f6;
+            border: 1px solid #3b82f6;
+        }
+
+        .badge.halt {
+            background: rgba(245, 158, 11, 0.2);
+            color: #f59e0b;
+            border: 1px solid #f59e0b;
+        }
+
+        .badge.passes {
+            background: rgba(16, 185, 129, 0.2);
+            color: #10b981;
+            border: 1px solid #10b981;
+        }
+
+        .info-section {
+            margin-bottom: 20px;
+        }
+
+        .info-toggle {
+            width: 100%;
+            background: linear-gradient(135deg, #7c3aed 0%, #ec4899 100%);
+            color: white;
+            border: none;
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 1.1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .info-toggle:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(124, 58, 237, 0.4);
+        }
+
+        .info-content {
+            background: #1a1f3a;
+            border: 2px solid #2a3555;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 10px;
+            animation: slideDown 0.3s ease;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 15px;
+        }
+
+        .info-item {
+            background: #0f1628;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #2a3555;
+        }
+
+        .info-item h3 {
+            color: #60a5fa;
+            margin-bottom: 10px;
+            font-size: 1.1em;
+        }
+
+        .info-item p {
+            color: #9ca3af;
+            font-size: 0.9em;
+            line-height: 1.6;
+            margin-bottom: 8px;
+        }
+
+        .info-item p:last-child {
+            margin-bottom: 0;
+        }
+
+        .info-item strong {
+            color: #e0e0e0;
+        }
+
+        .news-container {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .news-item {
+            background: #1a1f3a;
+            border: 2px solid #2a3555;
+            border-radius: 12px;
+            padding: 20px;
+            transition: all 0.3s ease;
+            display: flex;
+            gap: 15px;
+        }
+
+        .news-item:hover {
+            border-color: #60a5fa;
+            transform: translateX(5px);
+            box-shadow: 0 4px 12px rgba(96, 165, 250, 0.2);
+        }
+
+        .news-ticker-badge {
+            background: linear-gradient(135deg, #7c3aed 0%, #ec4899 100%);
+            color: #fff;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 1.2em;
+            min-width: 80px;
+            text-align: center;
+            align-self: flex-start;
+        }
+
+        .news-content {
+            flex: 1;
+        }
+
+        .news-title {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #fff;
+            margin-bottom: 10px;
+            line-height: 1.4;
+        }
+
+        .news-title a {
+            color: #fff;
+            text-decoration: none;
+            transition: color 0.3s ease;
+        }
+
+        .news-title a:hover {
+            color: #60a5fa;
+        }
+
+        .news-meta {
+            display: flex;
+            gap: 15px;
+            color: #9ca3af;
+            font-size: 0.9em;
+            align-items: center;
+        }
+
+        .news-publisher {
+            color: #60a5fa;
+            font-weight: bold;
+        }
+
+        .news-time {
+            color: #9ca3af;
+        }
+
+        .no-data {
+            text-align: center;
+            padding: 60px;
+            color: #9ca3af;
+            font-size: 1.2em;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #2a3555;
+            border-top-color: #60a5fa;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 768px) {
+            .grid-container {
+                grid-template-columns: 1fr;
+            }
+            
+            .header h1 {
+                font-size: 1.8em;
+            }
+
+            .filters {
+                flex-direction: column;
+                gap: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🚀 Momentum Scanner</h1>
+        <p>High-Momentum Small-Cap Breakout Scanner</p>
+    </div>
+
+    <div class="tabs">
+        <button class="tab-button active" onclick="switchTab('scanner')">📊 Live Scanner</button>
+        <button class="tab-button" onclick="switchTab('news')">📰 Market News (7 Days)</button>
+    </div>
+
+    <div id="scannerTab" class="tab-content active">
+
+    <div class="filters">
+        <div class="filter-item">
+            <label>Price Range</label>
+            <div class="value">${{ min_price }} - ${{ max_price }}</div>
+        </div>
+        <div class="filter-item">
+            <label>Min % Change</label>
+            <div class="value">{{ min_pct_change }}%</div>
+        </div>
+        <div class="filter-item">
+            <label>Min RVOL</label>
+            <div class="value">{{ min_rvol }}x</div>
+        </div>
+        <div class="filter-item">
+            <label>Max Float</label>
+            <div class="value">{{ max_float }}M</div>
+        </div>
+    </div>
+
+    <div class="info-section">
+        <button class="info-toggle" onclick="toggleInfo()">
+            <span id="toggleIcon">📚</span> KPI Guide - Learn What Each Metric Means
+        </button>
+        <div id="infoContent" class="info-content" style="display: none;">
+            <div class="info-grid">
+                <div class="info-item">
+                    <h3>🎯 Score (0-100)</h3>
+                    <p><strong>What it is:</strong> Overall momentum score combining all KPIs.</p>
+                    <p><strong>Why it matters:</strong> Higher score = stronger momentum potential. Look for 60+.</p>
+                    <p><strong>Categories:</strong> Momentum (30%), Liquidity (20%), Volatility (20%), Structure (15%), Catalyst (15%)</p>
+                </div>
+
+                <div class="info-item">
+                    <h3>💰 Price & % Change</h3>
+                    <p><strong>What it is:</strong> Current stock price and percentage move from today's open.</p>
+                    <p><strong>Why it matters:</strong> Shows how much the stock has moved today. Green = up, Red = down.</p>
+                    <p><strong>Target:</strong> Look for +10% or more for strong momentum plays.</p>
+                </div>
+
+                <div class="info-item">
+                    <h3>📊 RVOL (Relative Volume)</h3>
+                    <p><strong>What it is:</strong> Today's volume compared to the 20-day average. Example: 5x means 5 times normal volume.</p>
+                    <p><strong>Why it matters:</strong> High RVOL = unusual activity, often precedes big moves.</p>
+                    <p><strong>Target:</strong> 5x+ is explosive. 10x+ can lead to trading halts.</p>
+                </div>
+
+                <div class="info-item">
+                    <h3>🎈 Float</h3>
+                    <p><strong>What it is:</strong> Number of shares available for public trading (in millions).</p>
+                    <p><strong>Why it matters:</strong> Lower float = easier to move. Low float + high volume = potential squeeze.</p>
+                    <p><strong>Target:</strong> Under 20M is "low float" territory. Under 10M is very explosive.</p>
+                </div>
+
+                <div class="info-item">
+                    <h3>📈 Volume</h3>
+                    <p><strong>What it is:</strong> Total shares traded today.</p>
+                    <p><strong>Why it matters:</strong> Confirms the move is real. High volume = strong conviction from traders.</p>
+                    <p><strong>Tip:</strong> Compare to float - if volume exceeds float, the entire float rotated!</p>
+                </div>
+
+                <div class="info-item">
+                    <h3>💵 Dollar Volume</h3>
+                    <p><strong>What it is:</strong> Price × Volume. Total dollar value traded.</p>
+                    <p><strong>Why it matters:</strong> Shows liquidity. $20M+ means you can actually trade it without slippage.</p>
+                    <p><strong>Warning:</strong> Low dollar volume = hard to enter/exit positions.</p>
+                </div>
+
+                <div class="info-item">
+                    <h3>📍 VWAP (Volume-Weighted Average Price)</h3>
+                    <p><strong>What it is:</strong> Average price weighted by volume throughout the day.</p>
+                    <p><strong>Why it matters:</strong> Traders use VWAP as support/resistance. Above VWAP = bullish.</p>
+                    <p><strong>Strategy:</strong> Strong stocks hold above VWAP all day. Bounces off VWAP = buy signal.</p>
+                </div>
+
+                <div class="info-item">
+                    <h3>📰 News</h3>
+                    <p><strong>What it is:</strong> Stock has recent news/catalyst.</p>
+                    <p><strong>Why it matters:</strong> The "why" behind the move. FDA approval, earnings, upgrades, etc.</p>
+                    <p><strong>Types:</strong> FDA (strongest), Earnings, Analyst Upgrades, Press Releases (weakest)</p>
+                </div>
+
+                <div class="info-item">
+                    <h3>⚠️ Halt Risk</h3>
+                    <p><strong>What it is:</strong> Stock might get halted due to extreme volatility.</p>
+                    <p><strong>Why it matters:</strong> Trading halts freeze all activity. Can gap up or down when resumed.</p>
+                    <p><strong>Formula:</strong> Low float + RVOL 5x+ = halt risk. Can be opportunity or danger.</p>
+                </div>
+
+                <div class="info-item">
+                    <h3>✓ Passes Filter</h3>
+                    <p><strong>What it is:</strong> Stock meets ALL scanner criteria.</p>
+                    <p><strong>Criteria:</strong> Price range, % change, RVOL, float, and news requirements.</p>
+                    <p><strong>Action:</strong> These are your top candidates for momentum plays.</p>
+                </div>
+
+                <div class="info-item" style="grid-column: 1 / -1; background: rgba(124, 58, 237, 0.1); border-color: #7c3aed;">
+                    <h3>🎓 Trading Strategy Tips</h3>
+                    <p><strong>Morning Gappers:</strong> Stocks up 10%+ premarket with news. Watch for continuation or fade.</p>
+                    <p><strong>Mid-Day Breakouts:</strong> Stocks breaking HOD (high of day) on volume. These can run hard.</p>
+                    <p><strong>Low Float Squeeze:</strong> Float under 20M + RVOL over 5x + Above VWAP = potential squeeze.</p>
+                    <p><strong>Risk Management:</strong> Always use stop losses. These are volatile plays. Never risk more than 1-2% of account per trade.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="status-bar">
+        <div class="last-update">
+            Last Update: <span id="lastUpdate">Loading...</span>
+        </div>
+        <div id="scanStatus" class="scanning">
+            <span class="loading"></span> Scanning...
+        </div>
+    </div>
+
+    <div class="grid-container" id="stockGrid">
+        <div class="no-data">
+            <div class="loading" style="display: block; margin: 0 auto 20px;"></div>
+            <p>Loading stock data...</p>
+        </div>
+    </div>
+
+    </div> <!-- End Scanner Tab -->
+
+    <div id="newsTab" class="tab-content">
+        <div class="status-bar">
+            <div class="last-update">
+                News from Scanner Universe + Top 50 Popular Stocks (AAPL, TSLA, NVDA, etc.)
+            </div>
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <div id="newsCount" style="color: #60a5fa;">Loading...</div>
+                <button onclick="updateNews()" style="background: linear-gradient(135deg, #7c3aed 0%, #ec4899 100%); color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 0.9em;">🔄 Refresh</button>
+            </div>
+        </div>
+
+        <div class="news-container" id="newsContainer">
+            <div class="no-data">
+                <div class="loading" style="display: block; margin: 0 auto 20px;"></div>
+                <p>Loading news...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentTab = 'scanner';
+        let newsCache = null;
+        let lastNewsUpdate = 0;
+        const NEWS_CACHE_DURATION = 3600000; // 1 hour in milliseconds
+
+        function switchTab(tabName) {
+            currentTab = tabName;
+            
+            // Update tab buttons
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            // Update tab content
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            document.getElementById(tabName + 'Tab').classList.add('active');
+            
+            // Load news if switching to news tab (only if cache is old or empty)
+            if (tabName === 'news') {
+                const now = Date.now();
+                if (!newsCache || (now - lastNewsUpdate) > NEWS_CACHE_DURATION) {
+                    updateNews();
+                } else {
+                    // Use cached news
+                    displayNews(newsCache);
+                }
+            }
+        }
+
+        function toggleInfo() {
+            const content = document.getElementById('infoContent');
+            const icon = document.getElementById('toggleIcon');
+            if (content.style.display === 'none') {
+                content.style.display = 'block';
+                icon.textContent = '📖';
+            } else {
+                content.style.display = 'none';
+                icon.textContent = '📚';
+            }
+        }
+
+        function updateNews() {
+            const container = document.getElementById('newsContainer');
+            const countEl = document.getElementById('newsCount');
+            
+            // Show loading state
+            container.innerHTML = '<div class="no-data"><div class="loading" style="display: block; margin: 0 auto 20px;"></div><p>Loading news from 60+ stocks... This may take 10-15 seconds.</p></div>';
+            countEl.textContent = 'Loading...';
+            
+            fetch('/api/news')
+                .then(response => response.json())
+                .then(data => {
+                    newsCache = data;
+                    lastNewsUpdate = Date.now();
+                    displayNews(data);
+                })
+                .catch(error => {
+                    console.error('Error fetching news:', error);
+                    container.innerHTML = '<div class="no-data"><p>Error loading news. Please try again.</p></div>';
+                });
+        }
+
+        function displayNews(data) {
+            const container = document.getElementById('newsContainer');
+            const countEl = document.getElementById('newsCount');
+            
+            if (!data.news || data.news.length === 0) {
+                if (data.warning) {
+                    container.innerHTML = `<div class="no-data"><p style="color: #f59e0b;">⚠️ ${data.warning}</p></div>`;
+                } else if (data.error) {
+                    container.innerHTML = `<div class="no-data"><p>Error: ${data.error}</p></div>`;
+                } else {
+                    container.innerHTML = '<div class="no-data"><p>No recent news found for tracked stocks.</p></div>';
+                }
+                countEl.textContent = '0 articles';
+                return;
+            }
+            
+            const cacheAge = Math.floor((Date.now() - lastNewsUpdate) / 60000);
+            const ageText = cacheAge < 60 ? `${cacheAge}m ago` : `${Math.floor(cacheAge / 60)}h ago`;
+            let countText = `${data.news.length} articles <span style="color: #9ca3af; font-size: 0.9em;">(updated ${ageText})</span>`;
+            if (data.warning) {
+                countText += ` <span style="color: #f59e0b; font-size: 0.85em;">⚠️ ${data.warning}</span>`;
+            }
+            countEl.innerHTML = countText;
+            
+            container.innerHTML = data.news.map(item => `
+                <div class="news-item">
+                    <div class="news-ticker-badge">${item.ticker}</div>
+                    <div class="news-content">
+                        <div class="news-title">
+                            <a href="${item.link}" target="_blank">${item.title}</a>
+                        </div>
+                        <div class="news-meta">
+                            <span class="news-publisher">📰 ${item.publisher}</span>
+                            <span class="news-time">🕒 ${item.ago}</span>
+                            <span style="color: #6b7280;">${item.timestamp}</span>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function updateDashboard() {
+            fetch('/api/stocks')
+                .then(response => response.json())
+                .then(data => {
+                    // Update last update time
+                    document.getElementById('lastUpdate').textContent = data.last_update || 'Never';
+                    
+                    // Update scanning status
+                    const statusEl = document.getElementById('scanStatus');
+                    if (data.is_scanning) {
+                        statusEl.innerHTML = '<span class="loading"></span> Scanning...';
+                        statusEl.className = 'scanning';
+                    } else {
+                        statusEl.textContent = '✓ Ready';
+                        statusEl.className = '';
+                        statusEl.style.color = '#10b981';
+                    }
+
+                    // Update stock grid
+                    const grid = document.getElementById('stockGrid');
+                    
+                    if (data.stocks.length === 0) {
+                        grid.innerHTML = '<div class="no-data"><p>No stocks currently meet filter criteria.</p><p style="font-size: 0.9em; margin-top: 10px; color: #6b7280;">Scanning continues in background...</p></div>';
+                        return;
+                    }
+
+                    grid.innerHTML = data.stocks.map(stock => {
+                        const pctClass = stock.pct_change >= 0 ? 'positive' : 'negative';
+                        const pctSign = stock.pct_change >= 0 ? '+' : '';
+                        const cardClass = stock.passes_filter ? 'stock-card passes-filter' : 
+                                        stock.halt_risk ? 'stock-card halt-risk' : 'stock-card';
+                        
+                        let badges = '';
+                        if (stock.above_vwap) badges += '<span class="badge vwap">Above VWAP</span>';
+                        if (stock.has_news) badges += '<span class="badge news">News</span>';
+                        if (stock.halt_risk) badges += '<span class="badge halt">Halt Risk</span>';
+                        if (stock.passes_filter) badges += '<span class="badge passes">✓ Passes Filter</span>';
+
+                        return `
+                            <div class="${cardClass}">
+                                <div class="card-header">
+                                    <div class="ticker">${stock.ticker}</div>
+                                    <div class="score">${stock.score}</div>
+                                </div>
+                                <div class="price-info">
+                                    <div class="price">$${stock.price}</div>
+                                    <div class="pct-change ${pctClass}">${pctSign}${stock.pct_change}%</div>
+                                </div>
+                                <div class="metrics">
+                                    <div class="metric">
+                                        <div class="metric-label">RVOL</div>
+                                        <div class="metric-value">${stock.rvol}x</div>
+                                    </div>
+                                    <div class="metric">
+                                        <div class="metric-label">Float</div>
+                                        <div class="metric-value">${stock.float}M</div>
+                                    </div>
+                                    <div class="metric">
+                                        <div class="metric-label">Volume</div>
+                                        <div class="metric-value">${(stock.volume / 1000000).toFixed(2)}M</div>
+                                    </div>
+                                    <div class="metric">
+                                        <div class="metric-label">$ Volume</div>
+                                        <div class="metric-value">$${stock.dollar_volume}M</div>
+                                    </div>
+                                </div>
+                                <div class="badges">${badges}</div>
+                            </div>
+                        `;
+                    }).join('');
+                })
+                .catch(error => {
+                    console.error('Error fetching data:', error);
+                });
+        }
+
+        // Update scanner every 5 seconds, news is cached and only refreshed every hour
+        updateDashboard();
+        setInterval(() => {
+            if (currentTab === 'scanner') {
+                updateDashboard();
+            }
+            // News no longer auto-refreshes - it uses cache
+        }, 5000);
+    </script>
+</body>
+</html>
