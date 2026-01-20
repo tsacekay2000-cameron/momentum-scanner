@@ -23,6 +23,11 @@ MIN_PCT_CHANGE = 2  # Relaxed to see stocks with any positive momentum
 MIN_RVOL = 1.5  # Relaxed to see stocks with above-average volume
 MAX_FLOAT = 100_000_000  # Relaxed to see more stocks
 
+# Cache for universe to avoid rate limiting
+_universe_cache = None
+_universe_cache_time = None
+UNIVERSE_CACHE_DURATION = 1800  # 30 minutes in seconds
+
 
 # ========== DATA LAYER (YFINANCE - FREE) ==========
 
@@ -30,7 +35,18 @@ def get_universe() -> List[str]:
     """
     Return a list of tickers to scan.
     Dynamically pulls top gainers, losers, and most active stocks daily.
+    Cached for 30 minutes to avoid rate limiting.
     """
+    global _universe_cache, _universe_cache_time
+    
+    # Check if we have a valid cache
+    if _universe_cache is not None and _universe_cache_time is not None:
+        age = time.time() - _universe_cache_time
+        if age < UNIVERSE_CACHE_DURATION:
+            print(f"Using cached universe ({len(_universe_cache)} stocks, {int(age/60)}min old)")
+            return _universe_cache
+    
+    print("Refreshing universe from Yahoo Finance screeners...")
     tickers = set()
     
     # Base watchlist - popular volatile stocks
@@ -41,51 +57,38 @@ def get_universe() -> List[str]:
     try:
         import pandas as pd
         
-        # Fetch top gainers
-        try:
-            gainers_url = "https://finance.yahoo.com/screener/predefined/day_gainers"
-            gainers_tables = pd.read_html(gainers_url)
-            if gainers_tables and len(gainers_tables) > 0:
-                gainers_df = gainers_tables[0]
-                if 'Symbol' in gainers_df.columns:
-                    gainers = gainers_df['Symbol'].head(30).tolist()
-                    tickers.update(gainers)
-                    print(f"Added {len(gainers)} top gainers")
-        except Exception as e:
-            print(f"Could not fetch gainers: {e}")
+        # Add delay between requests to avoid rate limiting
+        def fetch_with_delay(url, name):
+            try:
+                time.sleep(2)  # 2 second delay between requests
+                tables = pd.read_html(url)
+                if tables and len(tables) > 0:
+                    df = tables[0]
+                    if 'Symbol' in df.columns:
+                        symbols = df['Symbol'].head(30).tolist()
+                        tickers.update(symbols)
+                        print(f"✓ Added {len(symbols)} {name}")
+                        return True
+            except Exception as e:
+                print(f"✗ Could not fetch {name}: {e}")
+                return False
         
-        # Fetch top losers
-        try:
-            losers_url = "https://finance.yahoo.com/screener/predefined/day_losers"
-            losers_tables = pd.read_html(losers_url)
-            if losers_tables and len(losers_tables) > 0:
-                losers_df = losers_tables[0]
-                if 'Symbol' in losers_df.columns:
-                    losers = losers_df['Symbol'].head(30).tolist()
-                    tickers.update(losers)
-                    print(f"Added {len(losers)} top losers")
-        except Exception as e:
-            print(f"Could not fetch losers: {e}")
-        
-        # Fetch most active
-        try:
-            active_url = "https://finance.yahoo.com/screener/predefined/most_actives"
-            active_tables = pd.read_html(active_url)
-            if active_tables and len(active_tables) > 0:
-                active_df = active_tables[0]
-                if 'Symbol' in active_df.columns:
-                    active = active_df['Symbol'].head(30).tolist()
-                    tickers.update(active)
-                    print(f"Added {len(active)} most active stocks")
-        except Exception as e:
-            print(f"Could not fetch most active: {e}")
+        # Fetch each screener with delays
+        fetch_with_delay("https://finance.yahoo.com/screener/predefined/day_gainers", "top gainers")
+        fetch_with_delay("https://finance.yahoo.com/screener/predefined/day_losers", "top losers")
+        fetch_with_delay("https://finance.yahoo.com/screener/predefined/most_actives", "most active")
             
     except Exception as e:
         print(f"Error fetching daily movers: {e}")
         print("Falling back to base watchlist only")
     
     ticker_list = list(tickers)
-    print(f"Total universe: {len(ticker_list)} stocks")
+    print(f"Total universe: {len(ticker_list)} stocks (cached for 30 min)")
+    
+    # Update cache
+    _universe_cache = ticker_list
+    _universe_cache_time = time.time()
+    
     return ticker_list
 
 
