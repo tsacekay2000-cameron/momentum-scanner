@@ -29,10 +29,64 @@ MAX_FLOAT = 100_000_000  # Relaxed to see more stocks
 def get_universe() -> List[str]:
     """
     Return a list of tickers to scan.
-    Plug in your own universe logic here - e.g., pre-filtered small caps, watchlist, etc.
+    Dynamically pulls top gainers, losers, and most active stocks daily.
     """
-    # Popular volatile small caps for testing
-    return ["GME", "AMC", "PLTR", "SOFI", "RIVN", "LCID", "NIO", "TLRY", "SNDL", "BBBY"]
+    tickers = set()
+    
+    # Base watchlist - popular volatile stocks
+    base_watchlist = ["GME", "AMC", "PLTR", "SOFI", "RIVN", "LCID", "NIO", "TLRY", "SNDL"]
+    tickers.update(base_watchlist)
+    
+    # Try to get daily movers from Yahoo Finance screener
+    try:
+        import pandas as pd
+        
+        # Fetch top gainers
+        try:
+            gainers_url = "https://finance.yahoo.com/screener/predefined/day_gainers"
+            gainers_tables = pd.read_html(gainers_url)
+            if gainers_tables and len(gainers_tables) > 0:
+                gainers_df = gainers_tables[0]
+                if 'Symbol' in gainers_df.columns:
+                    gainers = gainers_df['Symbol'].head(30).tolist()
+                    tickers.update(gainers)
+                    print(f"Added {len(gainers)} top gainers")
+        except Exception as e:
+            print(f"Could not fetch gainers: {e}")
+        
+        # Fetch top losers
+        try:
+            losers_url = "https://finance.yahoo.com/screener/predefined/day_losers"
+            losers_tables = pd.read_html(losers_url)
+            if losers_tables and len(losers_tables) > 0:
+                losers_df = losers_tables[0]
+                if 'Symbol' in losers_df.columns:
+                    losers = losers_df['Symbol'].head(30).tolist()
+                    tickers.update(losers)
+                    print(f"Added {len(losers)} top losers")
+        except Exception as e:
+            print(f"Could not fetch losers: {e}")
+        
+        # Fetch most active
+        try:
+            active_url = "https://finance.yahoo.com/screener/predefined/most_actives"
+            active_tables = pd.read_html(active_url)
+            if active_tables and len(active_tables) > 0:
+                active_df = active_tables[0]
+                if 'Symbol' in active_df.columns:
+                    active = active_df['Symbol'].head(30).tolist()
+                    tickers.update(active)
+                    print(f"Added {len(active)} most active stocks")
+        except Exception as e:
+            print(f"Could not fetch most active: {e}")
+            
+    except Exception as e:
+        print(f"Error fetching daily movers: {e}")
+        print("Falling back to base watchlist only")
+    
+    ticker_list = list(tickers)
+    print(f"Total universe: {len(ticker_list)} stocks")
+    return ticker_list
 
 
 def get_intraday_quote(ticker: str) -> Dict:
