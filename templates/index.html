@@ -6,7 +6,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <title>Momentum Scanner - Live Dashboard v2</title>
+    <title>Momentum Scanner - Live Dashboard v3</title>
     <style>
         * {
             margin: 0;
@@ -457,6 +457,130 @@
             to { transform: rotate(360deg); }
         }
 
+        /* Table View Styles */
+        .table-container {
+            background: #1a1f3a;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid #2a3555;
+        }
+
+        .momentum-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .momentum-table thead {
+            background: linear-gradient(135deg, #1e3a8a 0%, #7c3aed 100%);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .momentum-table th {
+            padding: 15px 12px;
+            text-align: left;
+            font-weight: bold;
+            color: #fff;
+            font-size: 0.95em;
+            border-bottom: 2px solid #2a3555;
+            white-space: nowrap;
+        }
+
+        .momentum-table th:hover {
+            background: rgba(255, 255, 255, 0.1);
+            cursor: pointer;
+        }
+
+        .momentum-table tbody tr {
+            border-bottom: 1px solid #2a3555;
+            transition: all 0.2s ease;
+        }
+
+        .momentum-table tbody tr:hover {
+            background: rgba(96, 165, 250, 0.1);
+        }
+
+        .momentum-table tbody tr.passes-filter {
+            background: rgba(16, 185, 129, 0.1);
+        }
+
+        .momentum-table tbody tr.passes-filter:hover {
+            background: rgba(16, 185, 129, 0.15);
+        }
+
+        .momentum-table td {
+            padding: 12px;
+            color: #e0e0e0;
+            font-size: 0.9em;
+        }
+
+        .momentum-table .ticker-cell {
+            font-weight: bold;
+            font-size: 1.1em;
+            color: #60a5fa;
+        }
+
+        .momentum-table .score-cell {
+            font-weight: bold;
+            font-size: 1.1em;
+        }
+
+        .momentum-table .score-high {
+            color: #10b981;
+        }
+
+        .momentum-table .score-medium {
+            color: #fbbf24;
+        }
+
+        .momentum-table .score-low {
+            color: #9ca3af;
+        }
+
+        .momentum-table .positive {
+            color: #10b981;
+            font-weight: bold;
+        }
+
+        .momentum-table .negative {
+            color: #ef4444;
+            font-weight: bold;
+        }
+
+        .momentum-table .badge-cell {
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+        }
+
+        .momentum-table .mini-badge {
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.75em;
+            font-weight: bold;
+        }
+
+        .momentum-table .mini-badge.passes {
+            background: #10b981;
+            color: #fff;
+        }
+
+        .momentum-table .mini-badge.vwap {
+            background: #3b82f6;
+            color: #fff;
+        }
+
+        .momentum-table .mini-badge.news {
+            background: #8b5cf6;
+            color: #fff;
+        }
+
+        .momentum-table .mini-badge.halt {
+            background: #f59e0b;
+            color: #fff;
+        }
+
         @media (max-width: 768px) {
             .grid-container {
                 grid-template-columns: 1fr;
@@ -470,6 +594,15 @@
                 flex-direction: column;
                 gap: 10px;
             }
+
+            .momentum-table {
+                font-size: 0.85em;
+            }
+
+            .momentum-table th,
+            .momentum-table td {
+                padding: 8px 6px;
+            }
         }
     </style>
 </head>
@@ -482,6 +615,7 @@
 
     <div class="tabs">
         <button class="tab-button active" onclick="switchTab('scanner')">📊 Live Scanner</button>
+        <button class="tab-button" onclick="switchTab('table')">📋 Table View</button>
         <button class="tab-button" onclick="switchTab('news')">📰 Market News (7 Days)</button>
     </div>
 
@@ -611,6 +745,41 @@
 
     </div> <!-- End Scanner Tab -->
 
+    <div id="tableTab" class="tab-content">
+        <div class="status-bar">
+            <div class="last-update" id="tableLastUpdate">Last Update: --</div>
+            <div id="tableScanStatus" class="scanning">
+                <span class="loading"></span> Scanning...
+            </div>
+        </div>
+
+        <div class="table-container">
+            <table class="momentum-table">
+                <thead>
+                    <tr>
+                        <th onclick="sortTable(0)">Ticker</th>
+                        <th onclick="sortTable(1)">Score</th>
+                        <th onclick="sortTable(2)">Price</th>
+                        <th onclick="sortTable(3)">% Change</th>
+                        <th onclick="sortTable(4)">RVOL</th>
+                        <th onclick="sortTable(5)">Float (M)</th>
+                        <th onclick="sortTable(6)">Volume (M)</th>
+                        <th onclick="sortTable(7)">$ Vol (M)</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody">
+                    <tr>
+                        <td colspan="9" style="text-align: center; padding: 40px;">
+                            <div class="loading" style="display: block; margin: 0 auto 20px;"></div>
+                            <p>Loading stock data...</p>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div> <!-- End Table Tab -->
+
     <div id="newsTab" class="tab-content">
         <div class="status-bar">
             <div class="last-update">
@@ -738,43 +907,75 @@
         }
 
         function updateDashboard() {
-            fetch('/api/stocks')
-                .then(response => response.json())
+            console.log('updateDashboard called at', new Date().toLocaleTimeString());
+            // Add cache-busting parameter
+            const cacheBust = Date.now();
+            fetch(`/api/stocks?t=${cacheBust}`)
+                .then(response => {
+                    console.log('Fetch response received:', response.status);
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
                 .then(data => {
-                    // Update last update time
-                    document.getElementById('lastUpdate').textContent = data.last_update || 'Never';
+                    console.log('Data received:', data);
+                    console.log('Number of stocks:', data.stocks ? data.stocks.length : 0);
                     
-                    // Update scanning status
+                    // Update last update time for both tabs
+                    document.getElementById('lastUpdate').textContent = data.last_update || 'Never';
+                    document.getElementById('tableLastUpdate').textContent = `Last Update: ${data.last_update || 'Never'}`;
+                    
+                    // Update scanning status for both tabs
                     const statusEl = document.getElementById('scanStatus');
+                    const tableStatusEl = document.getElementById('tableScanStatus');
+                    
                     if (data.is_scanning) {
                         statusEl.innerHTML = '<span class="loading"></span> Scanning...';
                         statusEl.className = 'scanning';
+                        tableStatusEl.innerHTML = '<span class="loading"></span> Scanning...';
+                        tableStatusEl.className = 'scanning';
                     } else {
                         statusEl.textContent = '✓ Ready';
                         statusEl.className = '';
                         statusEl.style.color = '#10b981';
+                        tableStatusEl.textContent = '✓ Ready';
+                        tableStatusEl.className = '';
+                        tableStatusEl.style.color = '#10b981';
                     }
 
-                    // Update stock grid
+                    // Update stock grid (existing card view)
                     const grid = document.getElementById('stockGrid');
                     
                     if (data.stocks.length === 0) {
                         grid.innerHTML = '<div class="no-data"><p>No stocks currently meet filter criteria.</p><p style="font-size: 0.9em; margin-top: 10px; color: #6b7280;">Scanning continues in background...</p></div>';
+                        
+                        // Also update table
+                        document.getElementById('tableBody').innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 40px;"><p>No stocks currently meet filter criteria.</p></td></tr>';
                         return;
                     }
 
-                    grid.innerHTML = data.stocks.map(stock => {
+
+                    // Split stocks into two groups
+                    const passing = data.stocks.filter(s => s.passes_filter);
+                    const others = data.stocks.filter(s => !s.passes_filter);
+
+                    function renderCard(stock) {
                         const pctClass = stock.pct_change >= 0 ? 'positive' : 'negative';
                         const pctSign = stock.pct_change >= 0 ? '+' : '';
-                        const cardClass = stock.passes_filter ? 'stock-card passes-filter' : 
-                                        stock.halt_risk ? 'stock-card halt-risk' : 'stock-card';
-                        
+                        let cardClass = 'stock-card';
+                        if (stock.passes_filter) {
+                            cardClass += ' passes-filter';
+                        } else if (stock.halt_risk) {
+                            cardClass += ' halt-risk';
+                        } else if (stock.top_gainer) {
+                            cardClass += ' top-gainer';
+                        }
                         let badges = '';
                         if (stock.above_vwap) badges += '<span class="badge vwap">Above VWAP</span>';
-                        if (stock.has_news) badges += '<span class="badge news">News</span>';
+                        if (stock.has_news) badges += `<a class="badge news" href="https://www.google.com/search?q=${stock.ticker}+stock+news" target="_blank" rel="noopener noreferrer">View News</a>`;
                         if (stock.halt_risk) badges += '<span class="badge halt">Halt Risk</span>';
                         if (stock.passes_filter) badges += '<span class="badge passes">✓ Passes Filter</span>';
-
                         return `
                             <div class="${cardClass}">
                                 <div class="card-header">
@@ -788,7 +989,7 @@
                                 <div class="metrics">
                                     <div class="metric">
                                         <div class="metric-label">RVOL</div>
-                                        <div class="metric-value">${stock.rvol}x</div>
+                                        <div class="metric-value">${stock.rvol.toFixed(2)}x</div>
                                     </div>
                                     <div class="metric">
                                         <div class="metric-label">Float</div>
@@ -796,27 +997,129 @@
                                     </div>
                                     <div class="metric">
                                         <div class="metric-label">Volume</div>
-                                        <div class="metric-value">${(stock.volume / 1000000).toFixed(2)}M</div>
+                                        <div class="metric-value">${stock.volume.toLocaleString()}</div>
                                     </div>
                                     <div class="metric">
                                         <div class="metric-label">$ Volume</div>
-                                        <div class="metric-value">$${stock.dollar_volume}M</div>
+                                        <div class="metric-value">$${stock.dollar_volume.toLocaleString()}</div>
                                     </div>
                                 </div>
                                 <div class="badges">${badges}</div>
                             </div>
                         `;
-                    }).join('');
+                    }
+
+                    let html = '';
+                    if (passing.length > 0) {
+                        html += '<h2 style="color:#10b981; margin-bottom:10px;">Top Momentum Candidates</h2>';
+                        html += passing.map(renderCard).join('');
+                    }
+                    if (others.length > 0) {
+                        html += '<h2 style="color:#fbbf24; margin:30px 0 10px 0;">Other Active Stocks (Outside Filter)</h2>';
+                        html += others.map(renderCard).join('');
+                    }
+                    grid.innerHTML = html;
+
+                    // Update table view
+                    updateTable(data.stocks);
                 })
                 .catch(error => {
                     console.error('Error fetching data:', error);
+                    // Display error on page
+                    const grid = document.getElementById('stockGrid');
+                    if (grid) {
+                        grid.innerHTML = `<div class="no-data"><p style="color: #ef4444;">❌ Error loading data: ${error.message}</p><p style="font-size: 0.9em; margin-top: 10px;">Check browser console for details.</p></div>`;
+                    }
                 });
         }
 
-        // Update scanner every 5 seconds, news is cached and only refreshed every hour
+        function updateTable(stocks) {
+            const tableBody = document.getElementById('tableBody');
+            
+            if (stocks.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 40px;"><p>No stocks currently meet filter criteria.</p></td></tr>';
+                return;
+            }
+
+            tableBody.innerHTML = stocks.map(stock => {
+                const pctClass = stock.pct_change >= 0 ? 'positive' : 'negative';
+                const pctSign = stock.pct_change >= 0 ? '+' : '';
+                let rowClass = '';
+                if (stock.passes_filter) {
+                    rowClass = 'passes-filter';
+                } else if (stock.top_gainer) {
+                    rowClass = 'top-gainer';
+                }
+                
+                // Score color coding
+                let scoreClass = 'score-low';
+                if (stock.score >= 70) scoreClass = 'score-high';
+                else if (stock.score >= 50) scoreClass = 'score-medium';
+                
+                // Build status badges
+                let badges = '';
+                if (stock.passes_filter) badges += '<span class="mini-badge passes">✓</span>';
+                if (stock.above_vwap) badges += '<span class="mini-badge vwap">VWAP</span>';
+                if (stock.has_news) badges += `<a class="mini-badge news" href="https://www.google.com/search?q=${stock.ticker}+stock+news" target="_blank" rel="noopener noreferrer">News</a>`;
+                if (stock.halt_risk) badges += '<span class="mini-badge halt">Halt</span>';
+
+                return `
+                    <tr class="${rowClass}">
+                        <td class="ticker-cell">${stock.ticker}</td>
+                        <td class="score-cell ${scoreClass}">${stock.score}</td>
+                        <td>$${stock.price}</td>
+                        <td class="${pctClass}">${pctSign}${stock.pct_change}%</td>
+                        <td>${stock.rvol.toFixed(2)}x</td>
+                        <td>${stock.float}M</td>
+                        <td>${stock.volume.toLocaleString()}</td>
+                        <td>$${stock.dollar_volume.toLocaleString()}</td>
+                        <td><div class="badge-cell">${badges}</div></td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        let sortDirection = {};
+        function sortTable(columnIndex) {
+            const table = document.querySelector('.momentum-table');
+            const tbody = table.querySelector('tbody');
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            
+            // Toggle sort direction
+            if (!sortDirection[columnIndex]) sortDirection[columnIndex] = 1;
+            else sortDirection[columnIndex] *= -1;
+            
+            const direction = sortDirection[columnIndex];
+            
+            rows.sort((a, b) => {
+                let aValue = a.cells[columnIndex].textContent.trim();
+                let bValue = b.cells[columnIndex].textContent.trim();
+                
+                // Remove special characters for numeric comparison
+                aValue = aValue.replace(/[$+%Mx]/g, '');
+                bValue = bValue.replace(/[$+%Mx]/g, '');
+                
+                // Try to parse as numbers
+                const aNum = parseFloat(aValue);
+                const bNum = parseFloat(bValue);
+                
+                if (!isNaN(aNum) && !isNaN(bNum)) {
+                    return (aNum - bNum) * direction;
+                } else {
+                    return aValue.localeCompare(bValue) * direction;
+                }
+            });
+            
+            // Re-append sorted rows
+            rows.forEach(row => tbody.appendChild(row));
+        }
+
+        // Update scanner every 5 seconds (updates both card and table views)
+        console.log('Momentum Scanner v3 initialized - auto-updating every 5s');
         updateDashboard();
         setInterval(() => {
-            if (currentTab === 'scanner') {
+            if (currentTab === 'scanner' || currentTab === 'table') {
+                console.log('Auto-update triggered for tab:', currentTab);
                 updateDashboard();
             }
             // News no longer auto-refreshes - it uses cache

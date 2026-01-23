@@ -27,18 +27,47 @@ def scan_stocks():
             with data_lock:
                 scanner_data['is_scanning'] = True
             
-            universe = get_universe()
-            results = []
+            print(f"\n{'='*50}")
+            print(f"Starting scan at {time.strftime('%H:%M:%S')}")
+            print(f"{'='*50}")
             
+
+            universe = get_universe()
+            from alpaca_data import get_market_movers
+            movers = get_market_movers(limit=50)
+            top_gainers = set(movers.get('gainers', []))
+            results = []
+
+            print(f"Scanning {len(universe)} stocks...")
+
+            scanned = 0
             for ticker in universe:
                 try:
+                    scanned += 1
+                    if scanned % 10 == 0:
+                        print(f"  Progress: {scanned}/{len(universe)} stocks")
+
+                    # Early filter: fetch quote and float only
+                    from alpaca_data import get_quote
+                    from momentum_scanner import get_float_shares
+                    quote = get_quote(ticker)
+                    if not quote or quote['price'] is None:
+                        continue
+                    price = float(quote['price'])
+                    if price < MIN_PRICE or price > MAX_PRICE:
+                        continue
+                    float_shares = get_float_shares(ticker)
+                    if float_shares is None or float_shares >= MAX_FLOAT:
+                        continue
+
+                    # Only now compute full KPIs
                     kpis = compute_kpis(ticker)
                     if not kpis:
                         continue
-                    
+
                     score = total_score(kpis)
                     passes = passes_base_filters(kpis)
-                    
+
                     results.append({
                         'ticker': ticker,
                         'score': round(score, 1),
@@ -47,18 +76,26 @@ def scan_stocks():
                         'rvol': round(kpis['relative_volume'], 2),
                         'float': round(kpis['float_shares'] / 1_000_000, 1),
                         'volume': kpis['volume'],
-                        'dollar_volume': round(kpis['dollar_volume'] / 1_000_000, 2),
+                        'dollar_volume': round(kpis['dollar_volume'], 2),  # Show normal numbers
                         'above_vwap': kpis['above_vwap'],
                         'has_news': kpis['has_news'],
                         'passes_filter': passes,
-                        'halt_risk': kpis['halt_risk']
+                        'halt_risk': kpis['halt_risk'],
+                        'top_gainer': ticker in top_gainers
                     })
                 except Exception as e:
                     print(f"Error scanning {ticker}: {e}")
                     continue
             
-            # Sort by score
-            results.sort(key=lambda x: x['score'], reverse=True)
+            # Sort: 1) passes_filter & has_news, 2) passes_filter, 3) score
+            results.sort(key=lambda x: (
+                not x['passes_filter'],           # passes_filter True first
+                not x['has_news'],                # has_news True first (within passes_filter)
+                -x['score']                       # then by score descending
+            ))
+            
+            print(f"Scan complete: {len(results)} stocks processed")
+            print(f"{'='*50}\n")
             
             with data_lock:
                 scanner_data['stocks'] = results
@@ -70,7 +107,7 @@ def scan_stocks():
             with data_lock:
                 scanner_data['is_scanning'] = False
         
-        time.sleep(60)  # Scan every 60 seconds
+        time.sleep(180)  # Scan every 3 minutes
 
 @app.route('/')
 def index():
@@ -87,10 +124,21 @@ def index():
 def test():
     return render_template('test.html')
 
+@app.route('/test_simple')
+def test_simple():
+    return render_template('test_simple.html')
+
 @app.route('/api/stocks')
 def get_stocks():
+    print(f"[API] /api/stocks called at {time.strftime('%H:%M:%S')}")
     with data_lock:
-        return jsonify(scanner_data)
+        data = {
+            'stocks': scanner_data.get('stocks', []),
+            'last_update': scanner_data.get('last_update'),
+            'is_scanning': scanner_data.get('is_scanning', False)
+        }
+        print(f"[API] Returning {len(data['stocks'])} stocks, last_update={data['last_update']}, is_scanning={data['is_scanning']}")
+        return jsonify(data)
 
 @app.route('/api/news')
 def get_news():

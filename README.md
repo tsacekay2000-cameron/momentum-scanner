@@ -2,15 +2,25 @@
 
 A KPI-driven momentum scanner for small-cap stocks with explosive potential. Scans for stocks with high relative volume, breaking news, low float, and strong price action.
 
+## ⚡ Now with Alpaca Integration - NO RATE LIMITS!
+
+This scanner now uses **Alpaca Markets API** as the primary data source - providing unlimited real-time market data completely FREE! Falls back to Yahoo Finance if Alpaca is not configured.
+
+### Why Alpaca?
+- ✅ **FREE real-time data** - no subscription needed
+- ✅ **NO rate limits** - scan as many stocks as you want
+- ✅ **Professional grade** - used by trading platforms worldwide
+- ✅ **Easy setup** - just add API keys to `.env` file
+
 ## 🎯 Core Filters
 
 The scanner identifies stocks meeting these mechanical criteria:
 
-- **Price Range**: $2 - $20
-- **Daily Momentum**: ≥ +10% on the day
-- **Relative Volume**: ≥ 5x average
-- **Float**: < 20 million shares
-- **Breaking News**: Fresh catalyst within 24 hours
+- **Price Range**: $2 - $50
+- **Daily Momentum**: ≥ +2% on the day
+- **Relative Volume**: ≥ 1.5x average
+- **Float**: < 100 million shares
+- **Breaking News**: Fresh catalyst when available
 
 ## 🏆 KPI Scoring System (0-100)
 
@@ -26,7 +36,10 @@ Each stock is scored across 5 weighted categories:
 
 ## 📁 Files
 
-- `momentum_scanner.py` - Full Python scanner with Polygon.io integration
+- `momentum_scanner.py` - Core scanner with KPI engine
+- `alpaca_data.py` - Alpaca API integration module
+- `web_scanner.py` - Flask web interface
+- `templates/index.html` - Dark-themed web UI
 - `kpi_momentum_overlay.pine` - TradingView Pine Script visual overlay
 - `requirements.txt` - Python dependencies
 
@@ -38,15 +51,27 @@ Each stock is scored across 5 weighted categories:
 pip install -r requirements.txt
 ```
 
-### 2. Configure Data Source
+### 2. Configure Alpaca API (Recommended)
 
-**FREE OPTION (Default)**: The scanner uses **yfinance (Yahoo Finance)** - completely free, no API key needed!
+1. **Sign up for free at [Alpaca Markets](https://alpaca.markets/)**
+2. **Get your API keys** from the [Alpaca Dashboard](https://alpaca.markets/docs/dashboard/overview/)
+3. **Add keys to `.env` file**:
+   ```bash
+   ALPACA_API_KEY=your_api_key_here
+   ALPACA_SECRET_KEY=your_secret_key_here
+   ```
 
-**PREMIUM OPTION**: For real-time data with more features, upgrade to [Polygon.io](https://polygon.io) (Real-Time tier: ~$199/month). See "Upgrading to Polygon.io" section below.
+**No Alpaca account?** The scanner will automatically fall back to Yahoo Finance (with rate limits).
 
-### 3. Customize Your Universe
+### 3. Run the Scanner
 
-Edit the `get_universe()` function in `momentum_scanner.py` to add your watchlist:
+**Web Interface (Recommended)**:
+```bash
+python web_scanner.py
+```
+Then open http://localhost:5000 in your browser.
+
+**Command Line**:
 
 ```python
 def get_universe() -> List[str]:

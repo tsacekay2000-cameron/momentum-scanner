@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test</title>
+</head>
+<body>
+    <h1>Simple Test</h1>
+    <div id="output">Loading...</div>
+    
+    <script>
+        console.log('Script is running!');
+        
+        fetch('/api/stocks')
+            .then(response => response.json())
+            .then(data => {
+                console.log('Data received:', data);
+                document.getElementById('output').textContent = 
+                    `Got ${data.stocks ? data.stocks.length : 0} stocks`;
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                document.getElementById('output').textContent = 'Error: ' + error.message;
+            });
+    </script>
+</body>
+</html>
