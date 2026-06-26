@@ -62,8 +62,8 @@ def get_most_active_stocks(limit: int = 200) -> List[str]:
             and len(asset.symbol) <= 5  # Exclude complex tickers
         ]
         
-        # Limit to first 500 for performance
-        tickers = tickers[:500]
+        # Limit to first 1000 for performance
+        tickers = tickers[:1000]
         
         # Get snapshots to find volume leaders
         if data_client and tickers:
@@ -77,7 +77,18 @@ def get_most_active_stocks(limit: int = 200) -> List[str]:
                     volume_data.append((symbol, snapshot.daily_bar.volume))
             
             volume_data.sort(key=lambda x: x[1], reverse=True)
-            return [symbol for symbol, _ in volume_data[:limit]]
+            ranked_symbols = [symbol for symbol, _ in volume_data[:limit]]
+
+            if len(ranked_symbols) < limit:
+                ranked_set = set(ranked_symbols)
+                for symbol in tickers:
+                    if symbol not in ranked_set:
+                        ranked_symbols.append(symbol)
+                        ranked_set.add(symbol)
+                    if len(ranked_symbols) >= limit:
+                        break
+
+            return ranked_symbols[:limit]
         
         return tickers[:limit]
         
@@ -165,6 +176,9 @@ def get_quote(symbol: str) -> Optional[Dict]:
             'prev_close': snap.previous_daily_bar.close if snap.previous_daily_bar else None,
             'timestamp': snap.latest_trade.timestamp if snap.latest_trade else None
         }
+        
+        # Debug output
+        print(f"[ALPACA DEBUG] {symbol}: volume={quote_data['volume']:,} from daily_bar")
         
         return quote_data
         

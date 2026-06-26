@@ -765,12 +765,13 @@
                         <th onclick="sortTable(5)">Float (M)</th>
                         <th onclick="sortTable(6)">Volume (M)</th>
                         <th onclick="sortTable(7)">$ Vol (M)</th>
+                        <th onclick="sortTable(8)">SMA 50Δ</th>
                         <th>Status</th>
                     </tr>
                 </thead>
                 <tbody id="tableBody">
                     <tr>
-                        <td colspan="9" style="text-align: center; padding: 40px;">
+                        <td colspan="10" style="text-align: center; padding: 40px;">
                             <div class="loading" style="display: block; margin: 0 auto 20px;"></div>
                             <p>Loading stock data...</p>
                         </td>
@@ -1003,6 +1004,10 @@
                                         <div class="metric-label">$ Volume</div>
                                         <div class="metric-value">$${stock.dollar_volume.toLocaleString()}</div>
                                     </div>
+                                    <div class="metric">
+                                        <div class="metric-label">SMA 50Δ</div>
+                                        <div class="metric-value ${stock.sma_50_delta >= 0 ? 'positive' : 'negative'}">${stock.sma_50_delta >= 0 ? '+' : ''}${stock.sma_50_delta.toFixed(2)}%</div>
+                                    </div>
                                 </div>
                                 <div class="badges">${badges}</div>
                             </div>
@@ -1037,7 +1042,7 @@
             const tableBody = document.getElementById('tableBody');
             
             if (stocks.length === 0) {
-                tableBody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 40px;"><p>No stocks currently meet filter criteria.</p></td></tr>';
+                tableBody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 40px;"><p>No stocks currently meet filter criteria.</p></td></tr>';
                 return;
             }
 
@@ -1063,6 +1068,8 @@
                 if (stock.has_news) badges += `<a class="mini-badge news" href="https://www.google.com/search?q=${stock.ticker}+stock+news" target="_blank" rel="noopener noreferrer">News</a>`;
                 if (stock.halt_risk) badges += '<span class="mini-badge halt">Halt</span>';
 
+                const smaClass = stock.sma_50_delta >= 0 ? 'positive' : 'negative';
+                const smaSign = stock.sma_50_delta >= 0 ? '+' : '';
                 return `
                     <tr class="${rowClass}">
                         <td class="ticker-cell">${stock.ticker}</td>
@@ -1073,6 +1080,7 @@
                         <td>${stock.float}M</td>
                         <td>${stock.volume.toLocaleString()}</td>
                         <td>$${stock.dollar_volume.toLocaleString()}</td>
+                        <td class="${smaClass}">${smaSign}${stock.sma_50_delta.toFixed(2)}%</td>
                         <td><div class="badge-cell">${badges}</div></td>
                     </tr>
                 `;

@@ -4,8 +4,7 @@ Web-based Momentum Scanner with Dark Theme and Grid Layout
 from flask import Flask, render_template, jsonify
 import time
 from momentum_scanner import (
-    get_universe, compute_kpis, passes_base_filters, 
-    total_score, MIN_PRICE, MAX_PRICE, MIN_PCT_CHANGE, 
+    run_scan, get_universe, MIN_PRICE, MAX_PRICE, MIN_PCT_CHANGE, 
     MIN_RVOL, MAX_FLOAT
 )
 from threading import Thread, Lock
@@ -31,83 +30,55 @@ def scan_stocks():
             print(f"Starting scan at {time.strftime('%H:%M:%S')}")
             print(f"{'='*50}")
             
-
-            universe = get_universe()
-            from alpaca_data import get_market_movers
-            movers = get_market_movers(limit=50)
-            top_gainers = set(movers.get('gainers', []))
+            # Use the new run_scan() function which handles Finviz hybrid mode
+            scan_results = run_scan()
+            
+            # Convert to web format
             results = []
+            for item in scan_results:
+                ticker = item['ticker']
+                kpis = item['kpis']
+                score = item['score']
+                
+                results.append({
+                    'ticker': ticker,
+                    'score': round(score, 1),
+                    'price': round(kpis['price'], 2),
+                    'pct_change': round(kpis['pct_change'], 2),
+                    'rvol': round(kpis['relative_volume'], 2),
+                    'float': round(kpis['float_shares'] / 1_000_000, 1),
+                    'volume': kpis['volume'],
+                    'avg_volume_20d': kpis['avg_volume_20d'],
+                    'dollar_volume': round(kpis['dollar_volume'], 2),
+                    'sma_50_delta': round(kpis.get('sma_50_delta', 0), 2),
+                    'above_vwap': kpis['above_vwap'],
+                    'has_news': kpis['has_news'],
+                    'passes_filter': True,  # Already filtered by run_scan()
+                    'halt_risk': kpis['halt_risk'],
+                    'top_gainer': False  # Can add this back if needed
+                })
 
-            print(f"Scanning {len(universe)} stocks...")
-
-            scanned = 0
-            for ticker in universe:
-                try:
-                    scanned += 1
-                    if scanned % 10 == 0:
-                        print(f"  Progress: {scanned}/{len(universe)} stocks")
-
-                    # Early filter: fetch quote and float only
-                    from alpaca_data import get_quote
-                    from momentum_scanner import get_float_shares
-                    quote = get_quote(ticker)
-                    if not quote or quote['price'] is None:
-                        continue
-                    price = float(quote['price'])
-                    if price < MIN_PRICE or price > MAX_PRICE:
-                        continue
-                    float_shares = get_float_shares(ticker)
-                    if float_shares is None or float_shares >= MAX_FLOAT:
-                        continue
-
-                    # Only now compute full KPIs
-                    kpis = compute_kpis(ticker)
-                    if not kpis:
-                        continue
-
-                    score = total_score(kpis)
-                    passes = passes_base_filters(kpis)
-
-                    results.append({
-                        'ticker': ticker,
-                        'score': round(score, 1),
-                        'price': round(kpis['price'], 2),
-                        'pct_change': round(kpis['pct_change'], 2),
-                        'rvol': round(kpis['relative_volume'], 2),
-                        'float': round(kpis['float_shares'] / 1_000_000, 1),
-                        'volume': kpis['volume'],
-                        'dollar_volume': round(kpis['dollar_volume'], 2),  # Show normal numbers
-                        'above_vwap': kpis['above_vwap'],
-                        'has_news': kpis['has_news'],
-                        'passes_filter': passes,
-                        'halt_risk': kpis['halt_risk'],
-                        'top_gainer': ticker in top_gainers
-                    })
-                except Exception as e:
-                    print(f"Error scanning {ticker}: {e}")
-                    continue
-            
-            # Sort: 1) passes_filter & has_news, 2) passes_filter, 3) score
-            results.sort(key=lambda x: (
-                not x['passes_filter'],           # passes_filter True first
-                not x['has_news'],                # has_news True first (within passes_filter)
-                -x['score']                       # then by score descending
-            ))
-            
-            print(f"Scan complete: {len(results)} stocks processed")
+            print(f"Scan complete: {len(results)} stocks qualified")
+            print(f"DEBUG: results list has {len(results)} items")
+            print(f"DEBUG: First few tickers: {[r['ticker'] for r in results[:3]]}")
             print(f"{'='*50}\n")
             
             with data_lock:
                 scanner_data['stocks'] = results
                 scanner_data['last_update'] = time.strftime('%Y-%m-%d %H:%M:%S')
                 scanner_data['is_scanning'] = False
+                print(f"DEBUG: Stored {len(scanner_data['stocks'])} stocks in scanner_data")
             
         except Exception as e:
             print(f"Scanner error: {e}")
+            import traceback
+            traceback.print_exc()
             with data_lock:
                 scanner_data['is_scanning'] = False
         
-        time.sleep(180)  # Scan every 3 minutes
+        # Scan every 15 minutes
+        print(f"Sleeping for 15 minutes...")
+        time.sleep(900)
 
 @app.route('/')
 def index():
